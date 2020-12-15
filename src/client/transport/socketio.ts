@@ -10,7 +10,12 @@ import * as ioNamespace from 'socket.io-client';
 const io = ioNamespace.default;
 
 import * as ActionCreators from '../../core/action-creators';
-import { Transport, TransportOpts, MetadataCallback } from './transport';
+import {
+  Transport,
+  TransportOpts,
+  MetadataCallback,
+  ChatCallback,
+} from './transport';
 import {
   CredentialedActionShape,
   FilteredMetadata,
@@ -18,6 +23,7 @@ import {
   PlayerID,
   State,
   SyncInfo,
+  ChatMessage,
 } from '../../types';
 
 interface SocketIOOpts {
@@ -41,6 +47,7 @@ export class SocketIOTransport extends Transport {
   socketOpts;
   callback: () => void;
   matchDataCallback: MetadataCallback;
+  chatMessageCallback: ChatCallback;
 
   /**
    * Creates a new Mutiplayer instance.
@@ -70,6 +77,7 @@ export class SocketIOTransport extends Transport {
     this.isConnected = false;
     this.callback = () => {};
     this.matchDataCallback = () => {};
+    this.chatMessageCallback = () => {};
   }
 
   /**
@@ -84,6 +92,10 @@ export class SocketIOTransport extends Transport {
       this.matchID,
       this.playerID
     );
+  }
+
+  onChatMessage(matchID, chatMessage) {
+    this.socket.emit('chat-message', matchID, chatMessage);
   }
 
   /**
@@ -145,6 +157,15 @@ export class SocketIOTransport extends Transport {
       }
     );
 
+    this.socket.on(
+      'chat-message',
+      (matchID: string, chatMessage: ChatMessage) => {
+        if (matchID === this.matchID) {
+          this.chatMessageCallback(chatMessage);
+        }
+      }
+    );
+
     // Keep track of connection status.
     this.socket.on('connect', () => {
       // Initial sync to get game state.
@@ -177,6 +198,10 @@ export class SocketIOTransport extends Transport {
 
   subscribeMatchData(fn: MetadataCallback) {
     this.matchDataCallback = fn;
+  }
+
+  subscribeChatMessage(fn: ChatCallback) {
+    this.chatMessageCallback = fn;
   }
 
   /**
